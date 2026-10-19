@@ -1,0 +1,23 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+const compile = file => ts.transpileModule(fs.readFileSync(new URL(file, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+const schoolModule = 'data:text/javascript;base64,' + Buffer.from(compile('./profile-school.ts')).toString('base64');
+const { resolveProfileSchool } = await import(schoolModule);
+const validationModule = compile('./profile-validation.ts').replace('"./profile-school"', JSON.stringify(schoolModule));
+const { validateProfile } = await import('data:text/javascript;base64,' + Buffer.from(validationModule).toString('base64'));
+const schools = [{ id: 2, name: 'New School', hubType: 'school' }, { id: 1, name: 'First School', hubType: 'school' }];
+const user = { name: 'Student', email: 'student@example.com', phone: '1234567890', flatWing: 'A1', buildingName: 'Home', detailedAddress: 'School Road', city: 'Mumbai', grade: '9', division: 'B', school: '' };
+test('existing members automatically get their joined school', () => assert.equal(resolveProfileSchool([schools[1]], ''), 'First School'));
+test('joining another school updates the profile to that school', () => assert.equal(resolveProfileSchool(schools, 'First School', 2), 'New School'));
+test('a valid school selection remains stable for multiple memberships', () => assert.equal(resolveProfileSchool(schools, 'First School'), 'First School'));
+test('leaving the selected school picks a remaining school', () => assert.equal(resolveProfileSchool([schools[0]], 'First School'), 'New School'));
+test('leaving the last school clears the profile school', () => assert.equal(resolveProfileSchool([], 'First School'), ''));
+test('non-school hubs do not fill in the school field', () => assert.equal(resolveProfileSchool([{ id: 3, name: 'Office', hubType: 'office' }], ''), ''));
+test('membership satisfies school validation even when old profile is blank', () => {
+  assert.equal(validateProfile(user, [schools[0]]).isComplete, true);
+  assert.equal(validateProfile(user, [schools[0]]).missingFields.includes('School'), false);
+});
+test('grade and division remain required', () => assert.deepEqual(validateProfile({ ...user, grade: '', division: '' }, [schools[0]]).missingFields, ['Grade', 'Division']));
+test('without a joined school or profile school, School is still missing', () => assert.equal(validateProfile(user, []).missingFields.includes('School'), true));
