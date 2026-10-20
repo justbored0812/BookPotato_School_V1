@@ -78,12 +78,14 @@ export default function EnhancedAuth() {
         body: JSON.stringify(data),
       });
       
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Login failed");
+      const result = await response.json().catch(() => null);
+      if (!result || !response.headers.get("content-type")?.includes("application/json")) {
+        throw new Error("The login server is unavailable. Please try again shortly.");
       }
-      
-      return response.json();
+      if (!response.ok) {
+        throw new Error(result.message || "Login failed");
+      }
+      return result;
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Logged in successfully!" });

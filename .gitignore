@@ -2,7 +2,6 @@ node_modules/
 dist/
 /scratch/
 /.vercel/
-/api/index.js
 /build
 *.log
 .DS_Store
